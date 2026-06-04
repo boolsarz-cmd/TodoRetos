@@ -17,7 +17,8 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === 'checkout.session.completed' || event.type === 'customer.subscription.created') {
+  if (event.type === 'checkout.session.completed' || event.type === 'customer.subscription.created' || event.type === 'invoice.payment_succeeded') {
+
     const session = event.data.object;
     const email = session.customer_email || session.customer_details?.email || 'desconocido';
 
