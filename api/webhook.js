@@ -1,29 +1,26 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+import Stripe from 'stripe';
 
-module.exports = async (req, res) => {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const sig = req.headers['stripe-signature'];
-  let event;
+  const buf = await req.text();
 
+  let event;
   try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
-  const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
   if (event.type === 'checkout.session.completed' || event.type === 'customer.subscription.created') {
     const session = event.data.object;
     const email = session.customer_email || session.customer_details?.email || 'desconocido';
 
-    // Crear enlace único de invitación
     const invRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/createChatInviteLink`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,11 +38,10 @@ module.exports = async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: CHAT_ID,
-        text: `🆕 Nuevo suscriptor\n📧 ${email}\n🔗 ${inviteLink}`,
-        parse_mode: 'HTML'
+        text: `🆕 Nuevo suscriptor\n📧 ${email}\n🔗 ${inviteLink}`
       })
     });
   }
 
   res.status(200).json({ received: true });
-};
+}
